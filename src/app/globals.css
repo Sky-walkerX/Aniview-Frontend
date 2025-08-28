@@ -1,26 +1,329 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Dark mode variant */
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-sans); 
   --font-mono: var(--font-geist-mono);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  /* Extra anime accent colors */
+  --color-red: var(--red);
+  --color-red-dark: var(--red-dark);
+  --color-blue: var(--blue);
+  --color-blue-dark: var(--blue-dark);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --radius: 0.625rem;
+
+  /* Main colors */
+  --background: #060D0E; /* Deep dark green/teal */
+  --foreground: #EBFFFE; /* Light mint/cyan */
+
+  /* UI cards/popovers */
+  --card: #0a1415;
+  --card-foreground: #EBFFFE;
+  --popover: #0a1415;
+  --popover-foreground: #EBFFFE;
+
+  /* Green Accents */
+  --primary: #3EFF8B; /* Bright mint green */
+  --primary-foreground: #060D0E;
+  --secondary: #2dd56f;
+  --secondary-foreground: #060D0E;
+  --accent: #3EFF8B;
+  --accent-foreground: #060D0E;
+
+  /* Reddish Accents */
+  --red: #ff5555;
+  --red-dark: #cc2222;
+
+  /* Blueish Accents */
+  --blue: #4dc9ff;
+  --blue-dark: #1a8eb3;
+
+  /* Muted colors */
+  --muted: #0e1e1f;
+  --muted-foreground: #a8d4d1;
+
+  /* Borders & input */
+  --border: #1a2d2e;
+  --input: #0e1e1f;
+  --ring: #3EFF8B;
+}
+
+/* Dark mode (Even deeper with brighter accents) */
+.dark {
+  --background: #030808;
+  --foreground: #EBFFFE;
+  --card: #050b0c;
+  --card-foreground: #EBFFFE;
+  --popover: #050b0c;
+  --popover-foreground: #EBFFFE;
+
+  /* Brighter green in dark mode */
+  --primary: #4cffaa;
+  --primary-foreground: #030808;
+  --secondary: #3EFF8B;
+  --secondary-foreground: #030808;
+  --accent: #4cffaa;
+  --accent-foreground: #030808;
+
+  /* Richer reds */
+  --red: #ff6b6b;
+  --red-dark: #b82c2c;
+
+  /* Richer blues */
+  --blue: #5dd6ff;
+  --blue-dark: #1569a6;
+
+  /* Muted & borders */
+  --muted: #0a1212;
+  --muted-foreground: #9fcccc;
+  --border: #152424;
+  --input: #0a1212;
+  --ring: #4cffaa;
+}
+
+/* Base layer */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans), sans-serif;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Custom Scrollbar Styles */
+@layer utilities {
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary) / 0.8) hsl(var(--muted) / 0.3);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: linear-gradient(
+      hsl(var(--muted) / 0.2), 
+      hsl(var(--muted) / 0.4), 
+      hsl(var(--muted) / 0.2)
+    );
+    border-radius: 6px;
+    border: 1px solid hsl(var(--border) / 0.3);
+    box-shadow: inset 0 1px 2px hsl(var(--background) / 0.8);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(
+      hsl(var(--primary) / 0.9), 
+      hsl(var(--primary) / 0.7), 
+      hsl(var(--primary) / 0.9)
+    );
+    border-radius: 6px;
+    border: 1px solid hsl(var(--primary) / 0.3);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 
+      0 2px 4px hsl(var(--primary) / 0.3),
+      inset 0 1px 0 hsl(var(--primary) / 0.4);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+      hsl(var(--primary)), 
+      hsl(var(--primary) / 0.8), 
+      hsl(var(--primary))
+    );
+    box-shadow: 
+      0 3px 6px hsl(var(--primary) / 0.4),
+      inset 0 1px 0 hsl(var(--primary) / 0.5);
+    transform: scale(1.1);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-corner {
+    background: hsl(var(--muted) / 0.3);
+    border-radius: 6px;
+  }
+
+  /* Horizontal scrollbar specific styles for episodes */
+  .episodes-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary) / 0.8) transparent;
+    padding-bottom: 8px;
+  }
+
+  .episodes-scrollbar::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .episodes-scrollbar::-webkit-scrollbar-track {
+    background: linear-gradient(90deg, 
+      hsl(var(--background)) 0%, 
+      hsl(var(--border) / 0.3) 10%, 
+      hsl(var(--border) / 0.3) 90%, 
+      hsl(var(--background)) 100%
+    );
+    border-radius: 8px;
+    margin: 0 12px;
+    border: 1px solid hsl(var(--border) / 0.2);
+    box-shadow: inset 0 1px 3px hsl(var(--background) / 0.8);
+  }
+
+  .episodes-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, 
+      hsl(var(--primary) / 0.9), 
+      hsl(var(--secondary) / 0.9), 
+      hsl(var(--primary) / 0.9)
+    );
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 
+      0 2px 4px hsl(var(--primary) / 0.3),
+      0 0 8px hsl(var(--primary) / 0.2),
+      inset 0 1px 0 hsl(var(--primary) / 0.3);
+    position: relative;
+  }
+
+  .episodes-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, 
+      hsl(var(--primary)), 
+      hsl(var(--secondary)), 
+      hsl(var(--primary))
+    );
+    transform: scaleY(1.3);
+    box-shadow: 
+      0 4px 8px hsl(var(--primary) / 0.4),
+      0 0 16px hsl(var(--primary) / 0.3),
+      inset 0 1px 0 hsl(var(--primary) / 0.5);
+  }
+
+  .episodes-scrollbar::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(90deg, 
+      hsl(var(--primary) / 1.1), 
+      hsl(var(--secondary) / 1.1), 
+      hsl(var(--primary) / 1.1)
+    );
+    transform: scaleY(1.1);
+    box-shadow: 
+      0 2px 4px hsl(var(--primary) / 0.5),
+      0 0 12px hsl(var(--primary) / 0.4),
+      inset 0 1px 0 hsl(var(--primary) / 0.6);
+  }
+
+  /* Enhanced track styling with better visual depth */
+  .episodes-scrollbar::-webkit-scrollbar-track:hover {
+    background: linear-gradient(90deg, 
+      hsl(var(--background)) 0%, 
+      hsl(var(--border) / 0.4) 10%, 
+      hsl(var(--border) / 0.4) 90%, 
+      hsl(var(--background)) 100%
+    );
+    box-shadow: inset 0 1px 3px hsl(var(--background) / 0.9);
+  }
+
+  /* Modern scrollbar fade-in effect */
+  .episodes-scrollbar {
+    --scrollbar-opacity: 0.6;
+    transition: --scrollbar-opacity 0.3s ease;
+    position: relative;
+  }
+
+  .episodes-scrollbar:hover {
+    --scrollbar-opacity: 1;
+  }
+
+  .episodes-scrollbar::-webkit-scrollbar-thumb {
+    opacity: var(--scrollbar-opacity);
+  }
+
+  /* Scrolling glow effect */
+  .episodes-scrollbar.scrolling::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, 
+      transparent, 
+      hsl(var(--primary) / 0.6), 
+      hsl(var(--secondary) / 0.6), 
+      hsl(var(--primary) / 0.6), 
+      transparent
+    );
+    animation: scrollGlow 0.5s ease-out;
+    border-radius: 1px;
+  }
+
+  @keyframes scrollGlow {
+    0% {
+      opacity: 0;
+      transform: scaleX(0);
+    }
+    50% {
+      opacity: 1;
+      transform: scaleX(1);
+    }
+    100% {
+      opacity: 0;
+      transform: scaleX(1);
+    }
+  }
+
+  /* Responsive scrollbar - smaller on mobile */
+  @media (max-width: 768px) {
+    .episodes-scrollbar::-webkit-scrollbar {
+      height: 6px;
+    }
+    
+    .episodes-scrollbar::-webkit-scrollbar-track {
+      margin: 0 8px;
+      border-radius: 6px;
+    }
+    
+    .episodes-scrollbar::-webkit-scrollbar-thumb {
+      border-radius: 6px;
+      border: 1px solid transparent;
+    }
+  }
+
+  /* Ultra-thin scrollbar for mobile */
+  @media (max-width: 480px) {
+    .episodes-scrollbar::-webkit-scrollbar {
+      height: 4px;
+    }
+    
+    .episodes-scrollbar::-webkit-scrollbar-thumb:hover {
+      transform: scaleY(1.5);
+    }
+  }
 }
