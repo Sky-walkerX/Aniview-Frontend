@@ -101,7 +101,7 @@ export const Header = () => {
       </h1>
       <p className="max-w-2xl text-base md:text-xl mt-8 text-muted-foreground drop-shadow-md">
         Dive into your favorite anime with crystal-clear streaming, real-time subtitles, 
-        and party watch features. AniView is built for fans who want speed, style, and 
+        and smart recommendations. AniView is built for fans who want speed, style, and 
         an endless library of anime adventures — all in one place.
       </p>
     </div>

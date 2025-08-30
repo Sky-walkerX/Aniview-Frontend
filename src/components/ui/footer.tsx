@@ -56,7 +56,7 @@ export const Footer = () => {
             <ul className="space-y-2 text-muted-foreground">
               <li>
                 <a href="#" className="hover:text-primary transition-colors">
-                  Party Watch
+                  Smart Recommendations
                 </a>
               </li>
               <li>
@@ -66,7 +66,7 @@ export const Footer = () => {
               </li>
               <li>
                 <a href="#" className="hover:text-primary transition-colors">
-                  Recommendations
+                  Advanced Search
                 </a>
               </li>
               <li>

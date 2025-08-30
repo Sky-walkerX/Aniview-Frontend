@@ -1,4 +1,44 @@
 // API functions for anime data
+import axios, { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios'
+
+// Create axios instance with default config
+export const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_PREFIX || 'http://localhost:8000',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// Add auth token to requests
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('accessToken')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  }
+  return config
+})
+
+// Handle 401 responses
+api.interceptors.response.use(
+  (response: AxiosResponse) => response,
+  (error: AxiosError) => {
+    // Only redirect to login on 401 if we're not already on auth pages
+    if (error.response?.status === 401) {
+      if (typeof window !== 'undefined') {
+        const currentPath = window.location.pathname
+        // Don't redirect if we're already on login/signup or if this is an auth endpoint
+        if (!currentPath.includes('/login') && !currentPath.includes('/signup') && 
+            !error.config?.url?.includes('/api/auth/')) {
+          localStorage.removeItem('accessToken')
+          window.location.href = '/login'
+        }
+      }
+    }
+    return Promise.reject(error)
+  }
+)
 
 export interface Anime {
   id: number
