@@ -3,11 +3,10 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useForm } from "react-hook-form"
-import { Eye, EyeOff, Mail, Lock, AlertCircle, Loader2 } from "lucide-react"
+import { Eye, EyeOff, Mail, AlertCircle, Loader2 } from "lucide-react"
 import { Navbar } from "@/components/ui/navbar"
 import { Footer } from "@/components/ui/footer"
 import { Input } from "@/components/ui/input"
-import { LoadingIndicator } from "@/components/ui/loading-indicator"
 import { useLogin } from "@/hooks/use-auth"
 import { type LoginRequest } from "@/lib/auth"
 
@@ -25,16 +24,17 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginRequest) => {
     try {
       await loginMutation.mutateAsync(data)
-    } catch (error: any) {
-      if (error.field) {
-        setError(error.field as keyof LoginRequest, {
+    } catch (error: unknown) {
+      const authError = error as { field?: string; message?: string }
+      if (authError.field) {
+        setError(authError.field as keyof LoginRequest, {
           type: "server",
-          message: error.message,
+          message: authError.message || "An error occurred",
         })
       } else {
         setError("root", {
           type: "server",
-          message: error.message || "Login failed. Please try again.",
+          message: authError.message || "Login failed. Please try again.",
         })
       }
     }
@@ -108,11 +108,11 @@ export default function LoginPage() {
               )}
 
               {/* Password Requirements Help */}
-              {errors.root?.message?.includes("Invalid email or password") && (
+              {errors.root?.message?.includes("Invalid") && (
                 <div className="text-xs text-muted-foreground p-3 bg-muted/20 rounded-lg">
                   <p className="font-medium mb-1">Password Requirements:</p>
                   <ul className="space-y-1">
-                    <li>• At least 8 characters</li>
+                    <li>• At least 6 characters</li>
                     <li>• One lowercase letter</li>
                     <li>• One uppercase letter</li>
                     <li>• One digit</li>

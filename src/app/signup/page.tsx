@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useForm } from "react-hook-form"
-import { Eye, EyeOff, Mail, Lock, User, AlertCircle, Loader2, CheckCircle } from "lucide-react"
+import { Eye, EyeOff, Mail, User, AlertCircle, Loader2, CheckCircle } from "lucide-react"
 import { Navbar } from "@/components/ui/navbar"
 import { Footer } from "@/components/ui/footer"
 import { Input } from "@/components/ui/input"
@@ -28,27 +28,39 @@ export default function SignupPage() {
   const onSubmit = async (data: RegisterRequest) => {
     try {
       await registerMutation.mutateAsync(data)
-    } catch (error: any) {
-      if (error.field) {
-        setError(error.field as keyof RegisterRequest, {
+    } catch (error: unknown) {
+      const authError = error as { field?: string; message?: string }
+      if (authError.field) {
+        setError(authError.field as keyof RegisterRequest, {
           type: "server",
-          message: error.message,
+          message: authError.message || "An error occurred",
         })
       } else {
         setError("root", {
           type: "server",
-          message: error.message || "Registration failed. Please try again.",
+          message: authError.message || "Registration failed. Please try again.",
         })
       }
     }
   }
 
   const getPasswordStrength = (password: string) => {
-    if (!password) return { strength: 0, label: "" }
+    if (!password) return { 
+      strength: 0, 
+      label: "", 
+      color: "", 
+      checks: {
+        length: false,
+        lowercase: false,
+        uppercase: false,
+        number: false,
+        special: false,
+      }
+    }
     
     let strength = 0
     const checks = {
-      length: password.length >= 8,
+      length: password.length >= 6,
       lowercase: /[a-z]/.test(password),
       uppercase: /[A-Z]/.test(password),
       number: /\d/.test(password),
@@ -190,19 +202,19 @@ export default function SignupPage() {
                     </div>
                     
                     <div className="grid grid-cols-2 gap-1 text-xs">
-                      <div className={`flex items-center gap-1 ${passwordStrength.checks?.length ? 'text-green-500' : 'text-muted-foreground'}`}>
+                      <div className={`flex items-center gap-1 ${passwordStrength.checks.length ? 'text-green-500' : 'text-muted-foreground'}`}>
                         <CheckCircle className="h-3 w-3" />
-                        8+ characters
+                        6+ characters
                       </div>
-                      <div className={`flex items-center gap-1 ${passwordStrength.checks?.uppercase ? 'text-green-500' : 'text-muted-foreground'}`}>
+                      <div className={`flex items-center gap-1 ${passwordStrength.checks.uppercase ? 'text-green-500' : 'text-muted-foreground'}`}>
                         <CheckCircle className="h-3 w-3" />
                         Uppercase
                       </div>
-                      <div className={`flex items-center gap-1 ${passwordStrength.checks?.lowercase ? 'text-green-500' : 'text-muted-foreground'}`}>
+                      <div className={`flex items-center gap-1 ${passwordStrength.checks.lowercase ? 'text-green-500' : 'text-muted-foreground'}`}>
                         <CheckCircle className="h-3 w-3" />
                         Lowercase
                       </div>
-                      <div className={`flex items-center gap-1 ${passwordStrength.checks?.number ? 'text-green-500' : 'text-muted-foreground'}`}>
+                      <div className={`flex items-center gap-1 ${passwordStrength.checks.number ? 'text-green-500' : 'text-muted-foreground'}`}>
                         <CheckCircle className="h-3 w-3" />
                         Number
                       </div>
