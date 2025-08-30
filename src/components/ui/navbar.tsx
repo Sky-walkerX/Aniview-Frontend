@@ -108,6 +108,22 @@ export const Navbar = () => {
                   >
                     Manga
                   </Link>
+
+                  <hr className="my-2 border-border" />
+                  
+                  <Link
+                    href="/video-test"
+                    className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-primary/20 hover:text-primary transition-all duration-200 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ring-offset-2 ring-offset-background"
+                  >
+                    Video Test
+                  </Link>
+
+                  <Link
+                    href="/real-api-test"
+                    className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-primary/20 hover:text-primary transition-all duration-200 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ring-offset-2 ring-offset-background"
+                  >
+                    Real API Test
+                  </Link>
                 </div>
               </div>
             )}
@@ -125,6 +141,13 @@ export const Navbar = () => {
             className="font-medium hover:text-primary transition-colors duration-300 py-2 px-3 rounded-md hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ring-offset-2 ring-offset-background"
           >
             My List
+          </Link>
+
+          <Link
+            href="/video-test"
+            className="font-medium hover:text-secondary transition-colors duration-300 py-2 px-3 rounded-md hover:bg-secondary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ring-offset-2 ring-offset-background border border-secondary/30"
+          >
+            Video Test
           </Link>
         </div>
 

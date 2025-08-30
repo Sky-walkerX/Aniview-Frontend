@@ -2,47 +2,18 @@
 
 import { useParams } from "next/navigation"
 import Image from "next/image"
-import { Play, Calendar, Star, Users, AlertCircle, RefreshCw } from "lucide-react"
+import { useState } from "react"
+import { Play, Calendar, Star, Users, AlertCircle, RefreshCw, Grid, List } from "lucide-react"
 import { Navbar } from "@/components/ui/navbar"
 import { Footer } from "@/components/ui/footer"
 import { LoadingIndicator } from "@/components/ui/loading-indicator"
-import { useAnimeById } from "@/hooks/use-anime"
+import { VideoPlayer } from "@/components/ui/video-player"
+import { EpisodeList, EpisodeGrid } from "@/components/ui/episode-list"
+import { useAnimeById, useAnimeEpisodes, useVideoSources, usePrefetchVideoSources } from "@/hooks/use-anime"
 import { type Anime } from "@/lib/api"
+import { cn } from "@/lib/utils"
 
 // Remove the old interface since we're importing it from api.ts
-
-const VideoPlayer = () => {
-  return (
-    <div className="relative aspect-video bg-card rounded-xl overflow-hidden border border-border">
-      <video className="w-full h-full object-cover" controls autoPlay muted poster="/anime-video-thumbnail.png">
-        <source src="/placeholder-video.mp4" type="video/mp4" />
-        Your browser does not support the video tag.
-      </video>
-    </div>
-  )
-}
-
-const EpisodeItem = ({ episode, thumbnail }: { episode: number; thumbnail: string }) => {
-  return (
-    <div className="flex-shrink-0 w-48 bg-card rounded-lg border border-border hover:border-primary/50 transition-colors cursor-pointer group">
-      <div className="relative aspect-video overflow-hidden rounded-t-lg">
-        <Image
-          src={thumbnail || "/placeholder.svg"}
-          alt={`Episode ${episode}`}
-          fill
-          className="object-cover group-hover:scale-105 transition-transform duration-300"
-        />
-        <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-          <Play className="w-8 h-8 text-primary" fill="currentColor" />
-        </div>
-      </div>
-      <div className="p-3">
-        <h4 className="text-foreground font-medium text-sm">Episode {episode}</h4>
-        <p className="text-muted-foreground text-xs mt-1">24 min</p>
-      </div>
-    </div>
-  )
-}
 
 const LoadingSkeleton = () => {
   return (
@@ -99,15 +70,53 @@ const ErrorMessage = ({ error, retry }: { error: Error; retry: () => void }) => 
 export default function AnimePlayerPage() {
   const params = useParams()
   const animeId = params.id as string
+  const [currentEpisode, setCurrentEpisode] = useState(1)
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   
-  const { data: anime, isLoading, error, refetch, isFetching } = useAnimeById(animeId)
+  const { data: anime, isLoading: animeLoading, error: animeError, refetch: refetchAnime } = useAnimeById(animeId)
+  const { data: episodesData, isLoading: episodesLoading, error: episodesError } = useAnimeEpisodes(animeId)
+  
+  // Fetch video sources for current episode using the sources endpoint
+  const { data: videoData, isLoading: videoLoading, error: videoError } = useVideoSources(
+    animeId, 
+    currentEpisode
+  )
+  const { prefetchVideoSources } = usePrefetchVideoSources()
 
-  if (isLoading) {
+  // Use real episode data from backend
+  const episodes = episodesData?.episodes || []
+  const videoSources = videoData?.sources || []
+  const subtitles = videoData?.subtitles || []
+
+  // Prefetch video sources on episode hover
+  const handleEpisodeHover = (episodeNumber: number) => {
+    prefetchVideoSources(animeId, episodeNumber)
+  }
+
+  // Handle episode selection
+  const handleEpisodeSelect = (episodeNumber: number) => {
+    setCurrentEpisode(episodeNumber)
+  }
+
+  // Navigation functions
+  const handlePreviousEpisode = () => {
+    if (currentEpisode > 1) {
+      setCurrentEpisode(currentEpisode - 1)
+    }
+  }
+
+  const handleNextEpisode = () => {
+    if (currentEpisode < episodes.length) {
+      setCurrentEpisode(currentEpisode + 1)
+    }
+  }
+
+  if (animeLoading) {
     return <LoadingSkeleton />
   }
 
-  if (error) {
-    return <ErrorMessage error={error as Error} retry={() => refetch()} />
+  if (animeError) {
+    return <ErrorMessage error={animeError as Error} retry={() => refetchAnime()} />
   }
 
   if (!anime) {
@@ -123,21 +132,57 @@ export default function AnimePlayerPage() {
     )
   }
 
+  const selectedEpisode = episodes.find(ep => ep.number === currentEpisode)
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
       <main className="container mx-auto px-4 py-20">
         {/* Video Player */}
-        <VideoPlayer />
+        <div className="mb-8">
+          {videoLoading || episodesLoading ? (
+            <div className="aspect-video bg-muted rounded-xl flex items-center justify-center">
+              <LoadingIndicator text="Loading video..." />
+            </div>
+          ) : videoError ? (
+            <div className="aspect-video bg-muted rounded-xl flex items-center justify-center border border-border">
+              <div className="text-center">
+                <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
+                <p className="text-muted-foreground">Failed to load video sources</p>
+              </div>
+            </div>
+          ) : videoSources.length > 0 ? (
+            <VideoPlayer
+              sources={videoSources}
+              subtitles={subtitles}
+              title={anime.title.english}
+              episodeTitle={selectedEpisode?.title}
+              onPrevious={handlePreviousEpisode}
+              onNext={handleNextEpisode}
+              hasNext={currentEpisode < episodes.length}
+              hasPrevious={currentEpisode > 1}
+              intro={videoData?.intro || undefined}
+              outro={videoData?.outro || undefined}
+              className="aspect-video"
+            />
+          ) : (
+            <div className="aspect-video bg-muted rounded-xl flex items-center justify-center border border-border">
+              <div className="text-center">
+                <Play className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-muted-foreground">No video sources available</p>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Anime Details */}
-        <div className="grid md:grid-cols-3 gap-8 mt-8">
+        <div className="grid md:grid-cols-3 gap-8 mb-12">
           <div className="md:col-span-2">
             <div className="flex items-center gap-4 mb-4">
               <h1 className="text-3xl font-bold text-foreground">{anime.title.english}</h1>
-              {isFetching && (
-                <LoadingIndicator size="sm" text="Updating..." />
+              {episodesLoading && (
+                <LoadingIndicator size="sm" text="Loading episodes..." />
               )}
             </div>
 
@@ -160,9 +205,10 @@ export default function AnimePlayerPage() {
               </div>
 
               <span
-                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                className={cn(
+                  "px-3 py-1 rounded-full text-sm font-medium",
                   anime.status === "RELEASING" ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-                }`}
+                )}
               >
                 {anime.status}
               </span>
@@ -185,7 +231,7 @@ export default function AnimePlayerPage() {
           <div>
             <Image
               src={anime.coverImage.large || "/placeholder.svg"}
-              alt={anime.title.english || "test"}
+              alt={anime.title.english || "Anime"}
               width={300}
               height={400}
               className="w-full rounded-xl border border-border"
@@ -193,24 +239,68 @@ export default function AnimePlayerPage() {
           </div>
         </div>
 
-        {/* Episodes List */}
+        {/* Episodes Section */}
         <div className="mt-12">
-          <h2 className="text-2xl font-bold text-foreground mb-6">Episodes</h2>
-          <div className="relative">
-            {/* Gradient fade edges */}
-            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none"></div>
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none"></div>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-foreground">
+              Episodes {episodes.length > 0 && `(${episodes.length})`}
+            </h2>
             
-            <div className="flex space-x-4 overflow-x-auto pb-6 pt-2 episodes-scrollbar scroll-smooth">
-              {Array.from({ length: Math.min(anime.episodes, 12) }, (_, i) => (
-                <EpisodeItem
-                  key={i + 1}
-                  episode={i + 1}
-                  thumbnail={`/placeholder.svg?height=200&width=300&query=${anime.title.english} episode ${i + 1} thumbnail`}
-                />
-              ))}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  viewMode === 'list' 
+                    ? "bg-primary text-primary-foreground" 
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                )}
+              >
+                <List className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  viewMode === 'grid' 
+                    ? "bg-primary text-primary-foreground" 
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                )}
+              >
+                <Grid className="w-4 h-4" />
+              </button>
             </div>
           </div>
+
+          {episodesLoading ? (
+            <div className="text-center py-8">
+              <LoadingIndicator text="Loading episodes..." />
+            </div>
+          ) : episodesError ? (
+            <div className="text-center py-8">
+              <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
+              <p className="text-muted-foreground">Failed to load episodes</p>
+            </div>
+          ) : episodes.length > 0 ? (
+            viewMode === 'list' ? (
+              <EpisodeList
+                episodes={episodes}
+                currentEpisode={currentEpisode}
+                onEpisodeSelect={handleEpisodeSelect}
+                onEpisodeHover={handleEpisodeHover}
+              />
+            ) : (
+              <EpisodeGrid
+                episodes={episodes}
+                currentEpisode={currentEpisode}
+                onEpisodeSelect={handleEpisodeSelect}
+              />
+            )
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No episodes available</p>
+            </div>
+          )}
         </div>
       </main>
 
