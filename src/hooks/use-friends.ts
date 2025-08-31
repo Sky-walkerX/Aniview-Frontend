@@ -61,30 +61,17 @@ export const useFriends = () => {
       const token = getAuthToken()
       if (!token) throw new Error('No auth token available')
 
-      console.log('Making friends API request with token:', token.substring(0, 20) + '...')
-      console.log('API URL:', `${process.env.NEXT_PUBLIC_API_PREFIX}/api/friends`)
-
-      // Match the exact headers used in getCurrentUser from auth.ts
-      const headers = {
-        'authorization': `Bearer ${token}`,
-      }
-      
-      console.log('Request headers:', headers)
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_PREFIX}/api/friends`,
-        { 
-          method: 'GET',
-          headers 
-        }
-      )
-      
-      console.log('Response status:', response.status)
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()))
+      const response = await fetch('/api/friends', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include', // Include cookies
+      })
       
       return handleApiResponse(response)
     },
-    retry: false, // Disable retry for debugging
+    retry: 1,
   })
 }
 
@@ -96,17 +83,15 @@ export const useSendFriendRequest = () => {
       const token = getAuthToken()
       if (!token) throw new Error('No auth token available')
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_PREFIX}/api/friends/request`,
-        {
-          method: 'POST',
-          headers: {
-            'authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ receiver_username }),
-        }
-      )
+      const response = await fetch('/api/friends/request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include', // Include cookies
+        body: JSON.stringify({ receiver_username }),
+      })
       return handleApiResponse(response)
     },
     onSuccess: () => {
@@ -123,16 +108,14 @@ export const useAcceptFriendRequest = () => {
       const token = getAuthToken()
       if (!token) throw new Error('No auth token available')
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_PREFIX}/api/friends/accept/${friendship_id}`,
-        {
-          method: 'POST',
-          headers: {
-            'authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      )
+      const response = await fetch(`/api/friends/accept/${friendship_id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include', // Include cookies
+      })
       return handleApiResponse(response)
     },
     onSuccess: () => {
@@ -149,16 +132,14 @@ export const useRejectFriendRequest = () => {
       const token = getAuthToken()
       if (!token) throw new Error('No auth token available')
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_PREFIX}/api/friends/reject/${friendship_id}`,
-        {
-          method: 'DELETE',
-          headers: {
-            'authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      )
+      const response = await fetch(`/api/friends/reject/${friendship_id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include', // Include cookies
+      })
       return handleApiResponse(response)
     },
     onSuccess: () => {
@@ -175,16 +156,14 @@ export const useRemoveFriend = () => {
       const token = getAuthToken()
       if (!token) throw new Error('No auth token available')
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_PREFIX}/api/friends/remove/${friend_id}`,
-        {
-          method: 'DELETE',
-          headers: {
-            'authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      )
+      const response = await fetch(`/api/friends/remove/${friend_id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include', // Include cookies
+      })
       return handleApiResponse(response)
     },
     onSuccess: () => {
