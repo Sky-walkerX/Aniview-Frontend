@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Play, Pause, Volume2, VolumeX, Maximize, Settings, SkipBack, SkipForward, RotateCcw } from 'lucide-react'
+import { Play, Pause, Volume2, VolumeX, Maximize, Settings, SkipBack, SkipForward, RotateCcw, Captions, Minimize } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { type VideoSource, type Subtitle } from '@/lib/api'
 import Hls from 'hls.js'
@@ -41,12 +41,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [duration, setDuration] = useState(0)
   const [showControls, setShowControls] = useState(true)
   const [selectedQuality, setSelectedQuality] = useState('')
-  const [showSettings, setShowSettings] = useState(false)
+  const [showQualitySettings, setShowQualitySettings] = useState(false)
+  const [showSubtitleSettings, setShowSubtitleSettings] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showSkipIntro, setShowSkipIntro] = useState(false)
   const [showSkipOutro, setShowSkipOutro] = useState(false)
   const [hlsLoading, setHlsLoading] = useState(false)
   const [hlsError, setHlsError] = useState<string | null>(null)
+  const [selectedSubtitle, setSelectedSubtitle] = useState<string | null>(null)
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -78,6 +80,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const qualityOptions = getQualityOptions()
   
+  // Deduplicate subtitles
+  const uniqueSubtitles = subtitles.reduce((acc, subtitle) => {
+    if (!acc.some(s => s.label === subtitle.label)) {
+      acc.push(subtitle)
+    }
+    return acc
+  }, [] as Subtitle[])
+
   // Calculate selected source
   const selectedSource = qualityOptions.find(([quality]) => quality === selectedQuality)?.[1] || qualityOptions[0]?.[1]
 
@@ -87,6 +97,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setSelectedQuality(qualityOptions[0][0])
     }
   }, [qualityOptions, selectedQuality])
+
+  // Set default subtitle to English if available
+  useEffect(() => {
+    const englishSubtitle = uniqueSubtitles.find(s => s.label === 'English')
+    if (englishSubtitle) {
+      setSelectedSubtitle(englishSubtitle.label)
+    }
+  }, [subtitles])
 
   // HLS.js integration for .m3u8 streams
   useEffect(() => {
@@ -144,23 +162,47 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             fragLoadingTimeOut: 30000,
             fragLoadingMaxRetry: 10,
             fragLoadingRetryDelay: 2000,
-            // Since we're using proxy, we can use simple fetch setup
             fetchSetup: (context: any, initParams: RequestInit) => {
-              console.log('HLS.js fetch request to:', context.url)
-              return new Request(context.url, {
-                ...initParams,
-                mode: 'cors',
-                credentials: 'omit'
-              })
+              // You can modify headers here if needed
+              return new Request(context.url, initParams)
+            }
+          })
+
+          hls.on(Hls.Events.ERROR, (event, data) => {
+            if (!hls) return
+
+            console.error('HLS.js Error:', data)
+            setHlsLoading(false)
+
+            if (data.fatal) {
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  console.error('Fatal network error encountered, trying to recover...', data)
+                  setHlsError(`Network error: ${data.details}`)
+                  hls.startLoad()
+                  break
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  console.error('Fatal media error encountered, trying to recover...', data)
+                  setHlsError(`Media error: ${data.details}`)
+                  hls.recoverMediaError()
+                  break
+                default:
+                  console.error('An unrecoverable error occurred', data)
+                  setHlsError(`An unrecoverable error occurred: ${data.details}`)
+                  hls.destroy()
+                  break
+              }
+            } else {
+              setHlsError(`A non-fatal error occurred: ${data.details}`)
             }
           })
 
           // Always use proxy for HLS streams to handle CORS and ensure all segments are proxied
-          const proxyUrl = `/api/proxy-hls?url=${encodeURIComponent(videoUrl)}`
-          console.log('Using HLS proxy for all requests:', proxyUrl)
+          const proxiedUrl = `/api/proxy-hls?url=${encodeURIComponent(videoUrl)}`
+          console.log('Using HLS proxy for all requests:', proxiedUrl)
           console.log('Original video URL:', videoUrl)
           
-          hls.loadSource(proxyUrl)
+          hls.loadSource(proxiedUrl)
           hls.attachMedia(video)
 
           hls.on(Hls.Events.MEDIA_ATTACHED, () => {
@@ -185,113 +227,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               duration: data.details?.totalduration,
               fragments: data.details?.fragments?.length
             })
-          })
-
-          hls.on(Hls.Events.ERROR, (event, data) => {
-            console.error('HLS.js error event:', event)
-            console.error('Raw HLS.js error data:', data)
-            
-            // Handle case where data might be undefined or empty
-            if (!data || typeof data !== 'object') {
-              console.warn('HLS error with invalid data object:', data)
-              setHlsError('HLS stream error - invalid error data')
-              setHlsLoading(false)
-              return
-            }
-            
-            const errorInfo = {
-              type: data.type,
-              details: data.details,
-              fatal: data.fatal,
-              reason: data.reason,
-              response: data.response,
-              context: data.context,
-              networkDetails: data.networkDetails,
-              frag: data.frag,
-              level: data.level,
-              url: data.url || selectedSource?.url,
-              // Add more debugging info
-              loader: data.loader,
-              responseText: data.responseText,
-              responseCode: data.code
-            }
-            
-            console.error('HLS.js detailed error data:', errorInfo)
-            
-            setHlsLoading(false)
-
-            // Check for specific error types
-            if (data.details === 'manifestLoadError') {
-              console.error('Manifest load error through proxy for URL:', selectedSource?.url)
-              setHlsError('Failed to load HLS manifest through proxy - the stream may be unavailable')
-              return
-            }
-
-            if (data.details === 'fragLoadError') {
-              console.error('Fragment load error through proxy for URL:', selectedSource?.url)
-              setHlsError('Video segment load error - stream may be corrupted or CDN issues')
-              return
-            }
-
-            if (data.details === 'networkError') {
-              setHlsError('Network error - check your connection')
-              console.error('Network error for URL:', selectedSource?.url)
-              return
-            }
-
-            if (data.fatal) {
-              switch (data.type) {
-                case Hls.ErrorTypes.NETWORK_ERROR:
-                  console.log('Fatal network error encountered, trying to recover...')
-                  setHlsError('Network error - attempting recovery')
-                  setTimeout(() => {
-                    if (hls) {
-                      try {
-                        console.log('Attempting HLS recovery via startLoad()')
-                        hls.startLoad()
-                        setHlsError(null)
-                      } catch (e) {
-                        console.error('Failed to restart HLS load:', e)
-                        setHlsError('Failed to recover from network error')
-                      }
-                    }
-                  }, 2000)
-                  break
-                case Hls.ErrorTypes.MEDIA_ERROR:
-                  console.log('Fatal media error encountered, trying to recover...')
-                  setHlsError('Media error - attempting recovery')
-                  setTimeout(() => {
-                    if (hls) {
-                      try {
-                        console.log('Attempting HLS recovery via recoverMediaError()')
-                        hls.recoverMediaError()
-                        setHlsError(null)
-                      } catch (e) {
-                        console.error('Failed to recover from media error:', e)
-                        setHlsError('Failed to recover from media error')
-                      }
-                    }
-                  }, 2000)
-                  break
-                default:
-                  console.error('Fatal HLS error, cannot recover:', data)
-                  setHlsError(`Fatal error: ${data.details || 'Unknown error'}`)
-                  if (hls) {
-                    try {
-                      hls.destroy()
-                    } catch (e) {
-                      console.error('Error destroying HLS instance:', e)
-                    }
-                    hls = null
-                  }
-                  break
-              }
-            } else {
-              console.warn('Non-fatal HLS error:', data)
-              setHlsError(`Warning: ${data.details || 'Non-fatal error'}`)
-              // Clear non-fatal errors after a delay
-              setTimeout(() => setHlsError(null), 8000)
-            }
           })
 
           hls.on(Hls.Events.LEVEL_LOADED, (event, data) => {
@@ -413,6 +348,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setIsMuted(video.muted)
     }
 
+    const handleTextTrackChange = () => {
+      const tracks = video.textTracks
+      let activeTrack = null
+      for (let i = 0; i < tracks.length; i++) {
+        if (tracks[i].mode === 'showing') {
+          activeTrack = tracks[i].label
+          break
+        }
+      }
+      setSelectedSubtitle(activeTrack)
+    }
+
     video.addEventListener('loadstart', handleLoadStart)
     video.addEventListener('loadeddata', handleLoadedData)
     video.addEventListener('error', handleError)
@@ -421,6 +368,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     video.addEventListener('play', handlePlay)
     video.addEventListener('pause', handlePause)
     video.addEventListener('volumechange', handleVolumeChange)
+    video.textTracks.addEventListener('change', handleTextTrackChange)
 
     return () => {
       video.removeEventListener('loadstart', handleLoadStart)
@@ -431,6 +379,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       video.removeEventListener('play', handlePlay)
       video.removeEventListener('pause', handlePause)
       video.removeEventListener('volumechange', handleVolumeChange)
+      video.textTracks.removeEventListener('change', handleTextTrackChange)
     }
   }, [intro, outro])
 
@@ -513,6 +462,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     video.currentTime = seekTime
   }
 
+  const handleSubtitleChange = (label: string | null) => {
+    const video = videoRef.current
+    if (!video) return
+
+    for (let i = 0; i < video.textTracks.length; i++) {
+      const track = video.textTracks[i]
+      if (track.label === label) {
+        track.mode = 'showing'
+      } else {
+        track.mode = 'hidden'
+      }
+    }
+    setSelectedSubtitle(label)
+    setShowSubtitleSettings(false)
+  }
+
   const handleQualityChange = (quality: string) => {
     const video = videoRef.current
     if (!video) return
@@ -521,6 +486,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const isPlaying = !video.paused
     
     setSelectedQuality(quality)
+    setShowQualitySettings(false)
     
     // Wait for video to load new source
     video.addEventListener('loadeddata', () => {
@@ -539,6 +505,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       document.exitFullscreen()
       setIsFullscreen(false)
     }
+  }
+
+  const toggleQualitySettings = () => {
+    setShowSubtitleSettings(false)
+    setShowQualitySettings(s => !s)
+  }
+
+  const toggleSubtitleSettings = () => {
+    setShowQualitySettings(false)
+    setShowSubtitleSettings(s => !s)
   }
 
   const skipIntro = () => {
@@ -572,7 +548,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         poster="/anime-video-thumbnail.png"
         crossOrigin="anonymous"
       >
-        {subtitles.slice(0, 10).map((subtitle, index) => (
+        {uniqueSubtitles.map((subtitle, index) => (
           <track
             key={`${subtitle.label}-${index}`}
             kind={subtitle.kind as any}
@@ -632,117 +608,131 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           showControls ? "opacity-100" : "opacity-0"
         )}
       >
-        {/* Title */}
+        {/* Top controls */}
         {(title || episodeTitle) && (
-          <div className="absolute top-4 left-4">
-            <h3 className="text-white font-semibold text-lg">{title}</h3>
-            {episodeTitle && <p className="text-white/80 text-sm">{episodeTitle}</p>}
+          <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/50 to-transparent">
+            <h1 className="text-white text-xl font-bold">{title}</h1>
+            <h2 className="text-white text-lg">{episodeTitle}</h2>
           </div>
         )}
 
-        {/* Center play button */}
+        {/* Center controls */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <button
-            onClick={togglePlay}
-            className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
-          >
-            {isPlaying ? (
-              <Pause className="w-8 h-8 text-white" fill="currentColor" />
-            ) : (
-              <Play className="w-8 h-8 text-white ml-1" fill="currentColor" />
-            )}
+          <button onClick={togglePlay} className="p-4 bg-black/50 rounded-full">
+            {isPlaying ? <Pause size={48} className="text-white" /> : <Play size={48} className="text-white" />}
           </button>
         </div>
 
         {/* Bottom controls */}
         <div className="absolute bottom-0 left-0 right-0 p-4">
           {/* Progress bar */}
-          <div className="mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-white text-sm">{formatTime(currentTime)}</span>
             <input
               type="range"
               min="0"
               max="100"
-              value={duration ? (currentTime / duration) * 100 : 0}
+              value={(currentTime / duration) * 100 || 0}
               onChange={handleSeek}
-              className="w-full h-1 bg-white/30 rounded-lg appearance-none cursor-pointer slider"
+              className="w-full h-1 bg-gray-500/50 rounded-full appearance-none cursor-pointer accent-primary"
             />
+            <span className="text-white text-sm">{formatTime(duration)}</span>
           </div>
 
-          {/* Control buttons */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button onClick={togglePlay} className="text-white hover:text-primary transition-colors">
-                {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+          {/* Buttons */}
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center gap-4">
+              <button onClick={togglePlay} className="text-white">
+                {isPlaying ? <Pause size={24} /> : <Play size={24} />}
               </button>
-
               {hasPrevious && (
-                <button onClick={onPrevious} className="text-white hover:text-primary transition-colors">
-                  <SkipBack className="w-5 h-5" />
+                <button onClick={onPrevious} className="text-white">
+                  <SkipBack size={24} />
                 </button>
               )}
-
               {hasNext && (
-                <button onClick={onNext} className="text-white hover:text-primary transition-colors">
-                  <SkipForward className="w-5 h-5" />
+                <button onClick={onNext} className="text-white">
+                  <SkipForward size={24} />
                 </button>
               )}
-
-              <div className="flex items-center space-x-2">
-                <button onClick={toggleMute} className="text-white hover:text-primary transition-colors">
-                  {isMuted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              <div className="flex items-center gap-2">
+                <button onClick={toggleMute} className="text-white">
+                  {isMuted || volume === 0 ? <VolumeX size={24} /> : <Volume2 size={24} />}
                 </button>
                 <input
                   type="range"
                   min="0"
                   max="1"
-                  step="0.1"
+                  step="0.05"
                   value={isMuted ? 0 : volume}
                   onChange={handleVolumeChange}
-                  className="w-20 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer slider"
+                  className="w-24 h-1 bg-gray-500/50 rounded-full appearance-none cursor-pointer accent-primary"
                 />
               </div>
-
-              <span className="text-white text-sm">
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </span>
             </div>
 
-            <div className="flex items-center space-x-2">
-              {/* Quality selector */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowSettings(!showSettings)}
-                  className="text-white hover:text-primary transition-colors"
-                >
-                  <Settings className="w-5 h-5" />
-                </button>
+            <div className="flex items-center gap-4">
+              {/* Subtitles Button */}
+              {uniqueSubtitles.length > 0 && (
+                <div className="relative">
+                  <button onClick={toggleSubtitleSettings} className="text-white">
+                    <Captions size={24} />
+                  </button>
+                  {showSubtitleSettings && (
+                    <div className="absolute bottom-full right-0 mb-2 bg-black/80 rounded-lg p-2 min-w-[120px]">
+                      <h3 className="text-white text-sm font-bold px-2 py-1">Subtitles</h3>
+                      <ul>
+                        <li
+                          onClick={() => handleSubtitleChange(null)}
+                          className={`cursor-pointer px-2 py-1 rounded ${
+                            !selectedSubtitle ? 'bg-primary' : ''
+                          }`}
+                        >
+                          Off
+                        </li>
+                        {uniqueSubtitles.map(subtitle => (
+                          <li
+                            key={subtitle.label}
+                            onClick={() => handleSubtitleChange(subtitle.label)}
+                            className={`cursor-pointer px-2 py-1 rounded ${
+                              selectedSubtitle === subtitle.label ? 'bg-primary' : ''
+                            }`}
+                          >
+                            {subtitle.label}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
 
-                {showSettings && (
-                  <div className="absolute bottom-8 right-0 bg-black/90 backdrop-blur-sm rounded-lg p-2 min-w-24">
-                    <div className="text-white text-xs font-medium mb-2">Quality</div>
-                    {qualityOptions.map(([quality, source]) => (
-                      <button
-                        key={quality}
-                        onClick={() => {
-                          handleQualityChange(quality)
-                          setShowSettings(false)
-                        }}
-                        className={cn(
-                          "block w-full text-left px-2 py-1 text-sm rounded transition-colors",
-                          selectedQuality === quality
-                            ? "bg-primary text-primary-foreground"
-                            : "text-white hover:bg-white/20"
-                        )}
-                      >
-                        {quality}
-                      </button>
-                    ))}
+              {/* Settings Button */}
+              <div className="relative">
+                <button onClick={toggleQualitySettings} className="text-white">
+                  <Settings size={24} />
+                </button>
+                {showQualitySettings && (
+                  <div className="absolute bottom-full right-0 mb-2 bg-black/80 rounded-lg p-2 min-w-[120px]">
+                    <h3 className="text-white text-sm font-bold px-2 py-1">Quality</h3>
+                    <ul>
+                      {qualityOptions.map(([quality]) => (
+                        <li
+                          key={quality}
+                          onClick={() => handleQualityChange(quality)}
+                          className={`cursor-pointer px-2 py-1 rounded ${
+                            selectedQuality === quality ? 'bg-primary' : ''
+                          }`}
+                        >
+                          {quality}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
-
-              <button onClick={toggleFullscreen} className="text-white hover:text-primary transition-colors">
-                <Maximize className="w-5 h-5" />
+              <button onClick={toggleFullscreen} className="text-white">
+                {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
               </button>
             </div>
           </div>
